@@ -1,82 +1,72 @@
-import { fetchBreeds } from "./plus/cat-api.js";
-import { fetchCatByBreed } from "./plus/cat-api.js";
-import Notiflix from 'notiflix';
-// import SlimSelect from 'slim-select';
+import SlimSelect from 'slim-select';
+import { fetchBreeds } from './plus/cat-api.js';
+import { fetchCatByBreed } from './plus/cat-api.js';
+import { Notify } from 'notiflix';
 
+const refs = {
+  select: document.querySelector('.breed-select'),
+  catInfo: document.querySelector('.cat-info'),
+  loader: document.querySelector('.loader'),
+};
 
-// Globale constanten
-const selectPlaceholder = `<option class="js-selectOption js-placeholder-select" value="choose">Select the cat</option>`;
-
-// Query selectors
-const select = document.querySelector(".breed-select");
-const catInfoCard = document.querySelector(".cat-info");
-const loaderMessage = document.querySelector(".loader");
-const errorMessage = document.querySelector(".error");
-
-select.insertAdjacentHTML("afterbegin", selectPlaceholder);
-
-
-loaderMessage.hidden = false;
-select.hidden = true;
-
-function markupSelect(arr) {
-   return arr.map(({name, id}) => {
-    return `<option class="js-selectOption" value="${id}">${name}</option>`
-   }).join("");
+function createMarkupSelect(array) {
+  return array
+    .map(({id, name}) => {
+      return `<option value = "${id}">${name}</option>`;
+    })
+    .join('');
 }
 
 fetchBreeds()
-.then(data => {
-    select.insertAdjacentHTML("beforeend", markupSelect(data));
- 
-    loaderMessage.hidden = true;
-    select.hidden = false;
-})
-.catch(err => console.log(err))
-
-// Event listener for select
-select.addEventListener("change", onChangeSelect);
-
-function onChangeSelect() {
-    catInfoCard.classList.add("cat-card");
-    errorMessage.hidden = true;
-    loaderMessage.hidden = false;
-    select.hidden = true;
-
-   fetchCatByBreed(select.value)
-       .then(data => {
-       
-    const img = data[0].url;
-    const name = data[0].breeds[0].name;
-    const description = data[0].breeds[0].description;
-    const temperament = data[0].breeds[0].temperament;
-   
-catInfoCard.innerHTML = createCatCard(img, name, description, temperament);
-loaderMessage.hidden = true;
-select.hidden = false;
-catInfoCard.classList.remove("cat-card");
-})
-.catch(err => {
-    Report.failure(
-        'Oops! Something went wrong!',
-        'Please try again later',
-        'Okay',
+  .then(resultArray => {
+    refs.select.style.display = 'none';
+    refs.loader.style.display = 'none';
+    refs.select.insertAdjacentHTML(
+      'beforeend',
+      createMarkupSelect(resultArray.data)
     );
-    
-    loaderMessage.hidden = true;
-select.hidden = false;
-    console.log(err)
-    catInfoCard.classList.add("cat-card");
-})
+    refs.select.style.display = 'block';
+    new SlimSelect({
+      select: '#breed-select',
+    });
+  })
+  .catch(() => {
+    Notify.failure('Oops! Something went wrong! Try reloading the page');
+  });
+
+refs.select.addEventListener('change', handlerSelect);
+
+function handlerSelect(event) {
+  const catBreed = event.target.value;
+  refs.loader.style.display = 'block';
+  refs.catInfo.style.display = 'none';
+
+  fetchCatByBreed(catBreed)
+    .then(cat => {
+      refs.loader.style.display = 'none';
+      refs.catInfo.style.display = 'block';
+      if (catBreed === 'specialBreed') {
+          Notify.info('Information about cat is on updating, try later');
+      }
+      refs.catInfo.innerHTML = createMarkUp(cat.data);
+    })
+    .catch(() => {
+      Notify.failure('Oops! Something went wrong! Try reloading the page');
+    });
 }
 
-    function createCatCard(img, name, description, temperament){
-
-    return `<img class="js-cat-photo" src="${img}" alt="${name}" width="300">
-    <div class="js-cat-container">
+function createMarkUp(array) {
+  return array.map(({ url, breeds }) => {
+    const { name, description, temperament } = breeds[0];
+    return `
+    <div class="card">
+    <img class="image" src="${url}" alt="${name}">
+    <div class="cat-about">
       <h2>${name}</h2>
-      <p>${description}</p>
-      <h3>Temperament:</h3>
-      <p>${temperament}</p>
-    </div>`;
+      <p><span class="subtitle">Description:</span> ${description}</p>
+      <p><span class="subtitle">Temperament:</span> ${temperament}</p>
+    </div>
+    </div>
+    `;
+  });
 }
